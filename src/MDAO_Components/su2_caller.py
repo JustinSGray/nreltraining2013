@@ -139,6 +139,7 @@ class SU2_CLCD(Assembly):
 
             # Add these objects to the workflow
             self.driver.workflow.add(['deform%d'%j,'solve%d'%j])
+            
         print "done su2_caller configure"
 if __name__ == "__main__":
 

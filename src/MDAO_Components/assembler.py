@@ -45,8 +45,6 @@ class blade_opt(Assembly):
         super(blade_opt, self).__init__()
 
     def configure(self):
-        super(blade_opt, self).configure()
-
         print "In blade_opt configure"
 
         self.alpha_sweep = alpha_dist()
@@ -54,45 +52,30 @@ class blade_opt(Assembly):
 
 
         # Add SU2 Component
-        if self.fake:
-            self.add('su2',SU2_CLCD_Fake(self.alpha_sweep,nDVvals=self.nDVvals))
-        else:
-            self.add('su2',SU2_CLCD(self.alpha_sweep,nDVvals=self.nDVvals))        
+        self.add('su2',SU2_CLCD(self.alpha_sweep,nDVvals=self.nDVvals))        
 
-        # We are doing russian dolls, so the outer parameters are just the dvvals
-        if self.russianDolls:
-            # Add BEM Assembly (optimizes for theta given airfoil)
-            self.add('bem',BEMAssembly(self.alpha_sweep, self.r, optChord=self.optimizeChord))
-        else:
-            # Otherwise we just add the BEMComponent
-            self.add('bem',BEMComponent(self.alpha_sweep, self.r, optChord=self.optimizeChord))
+               # Otherwise we just add the BEMComponent
+        self.add('bem',BEMComponent(self.alpha_sweep, self.r, optChord=self.optimizeChord))
 
         # Create driver and add components to its workflow
         # Need to have something about if it's fake and russian dolls
-        if not (self.fake and self.russianDolls):
-            print "adding driver"
-            self.add('driver',CONMINdriver())
-            self.driver.workflow.add(['bem','su2'])   
-            # Objective: minimize negative power
-            self.driver.add_objective('-bem.power') 
-        else:
-            print "driver not added"
+       
+        self.add('driver',SLSQPdriver())
+        self.driver.workflow.add(['su2','bem'])   
+        # Objective: minimize negative power
+        self.driver.add_objective('-bem.power') 
 
 
         # Add Hicks-Henne bump function parameters
-        if not self.fake:
-            for i in range(self.nDVvals):
-                print "dv ", i
-                self.driver.add_parameter('su2.dv_vals[%d]' % i, low=-.05, high=.05)
+        for i in range(self.nDVvals):
+            print "dv ", i
+            self.driver.add_parameter('su2.dv_vals[%d]' % i, low=-.05, high=.05)
 
-        if self.russianDolls:
-            pass
-        else:
-            # If not nested, we want to add the theta (and maybe chord)
-            for i in range(self.nElements):
-                self.driver.add_parameter('bem.theta[%d]'%i,low=-80,high=80)
-                if self.optimizeChord:
-                    self.driver.add_parameter('bem.chord[%d]'%i,low=1e-8,high=10,start=1)
+        
+        for i in range(self.nElements):
+            self.driver.add_parameter('bem.theta[%d]'%i,low=-80,high=80)
+            if self.optimizeChord:
+                self.driver.add_parameter('bem.chord[%d]'%i,low=1e-8,high=10,start=1)
         # Connect outputs from SU^2 wrapper to CCBlade
         for i in range(self.nSweep):
             self.connect('su2.cls[%d]'%i, 'bem.cls[%d]'%i)
